@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        #chat-box { border: 1px solid #ccc; padding: 10px; height: 300px; overflow-y: scroll; }
+        #user-input { width: 80%; padding: 5px; }
+        #send-btn { padding: 5px 10px; }
+    </style>
+</head>
+<body>
+
+    <h2>Chatbot</h2>
+    <div id="chat-box"></div>
+
+    <input type="text" id="user-input" placeholder="Type a message...">
+    <button id="send-btn">Send</button>
+
+    <script>
+        // Generate a new sessionId for each tab and page load
+        let sessionId = sessionStorage.getItem("session_id") || generateSessionId();
+        sessionStorage.setItem("session_id", sessionId); // Store in sessionStorage (tab-specific)
+
+        function generateSessionId() {
+            return 'sess_' + Math.random().toString(36).substr(2, 9);
+        }
+
+        // Function to display chat history
+        function displayChatHistory(history) {
+            const chatBox = document.getElementById("chat-box");
+            chatBox.innerHTML = ""; // Clear existing content
+            history.forEach(msg => {
+                const sender = msg.role === "user" ? "You" : "Bot";
+                chatBox.innerHTML += `<p><b>${sender}:</b> ${msg.content}</p>`;
+            });
+            chatBox.scrollTop = chatBox.scrollHeight; // Scroll to bottom
+        }
+
+        // Fetch chat history when the page loads
+        window.onload = function() {
+            fetch("/api/chat/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-Session-ID": sessionId
+                },
+                body: JSON.stringify({ user_query: "" })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.chat_history && data.chat_history.length > 0) {
+                    displayChatHistory(data.chat_history);
+                }
+            })
+            .catch(error => console.error("Error fetching history:", error));
+        };
+
+        // Handle sending a message
+        document.getElementById("send-btn").addEventListener("click", function() {
+            let userQuery = document.getElementById("user-input").value;
+            if (!userQuery) return;
+
+            fetch("/api/chat/", {       
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-Session-ID": sessionId
+                },
+                body: JSON.stringify({ user_query: userQuery })
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Append new message and response
+                const chatBox = document.getElementById("chat-box");
+                chatBox.innerHTML += `<p><b>You:</b> ${userQuery}</p>`;
+                if (data.response) {  // Only append bot response if it exists
+                    chatBox.innerHTML += `<p><b>Bot:</b> ${data.response}</p>`;
+                }
+                chatBox.scrollTop = chatBox.scrollHeight; // Scroll to bottom
+                document.getElementById("user-input").value = ""; // Clear input
+            })
+            .catch(error => console.error("Error sending query:", error));
+        });
+    </script>
+
+</body>
+</html>
